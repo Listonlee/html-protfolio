@@ -1,0 +1,173 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>補習主動搵客工具 — 專案結構</title>
+<style>
+  * { box-sizing: border-box; margin: 0; padding: 0; }
+  body {
+    font-family: -apple-system, "PingFang HK", "Microsoft JhengHei", "Segoe UI", sans-serif;
+    background: #0f1220; color: #e6e8ef; line-height: 1.6;
+    padding: 40px 20px;
+  }
+  .wrap { max-width: 960px; margin: 0 auto; }
+  h1 { font-size: 1.9rem; font-weight: 800; margin-bottom: 6px;
+       background: linear-gradient(90deg,#ff6b8b,#ffa86b); -webkit-background-clip: text;
+       -webkit-text-fill-color: transparent; }
+  .sub { color: #9aa0b4; margin-bottom: 28px; font-size: .95rem; }
+  h2 { font-size: 1.15rem; margin: 34px 0 14px; display:flex; align-items:center; gap:8px;
+       border-left: 4px solid #ff6b8b; padding-left: 10px; }
+  .card { background: #181c2e; border: 1px solid #2a2f48; border-radius: 14px;
+          padding: 22px 24px; margin-bottom: 18px; }
+
+  /* ── 檔案樹 ── */
+  .tree { font-family: "SF Mono", "Cascadia Code", Consolas, monospace; font-size: .9rem; line-height: 1.9; }
+  .tree .dir { color: #7cc4ff; font-weight: 700; }
+  .tree .file { color: #e6e8ef; }
+  .tree .desc { color: #767c95; }
+  .tree .branch { color: #4a4f6b; }
+  .tag { display:inline-block; font-size:.7rem; padding:1px 8px; border-radius:20px; margin-left:6px; vertical-align:middle;}
+  .t-design { background:#2b2350; color:#c4b5ff; }
+  .t-core   { background:#23402f; color:#8ce0a8; }
+  .t-cfg    { background:#3a2e1e; color:#ffcd8c; }
+  .t-ui     { background:#3a2030; color:#ff9ec0; }
+
+  /* ── 資料流 ── */
+  .flow { display:flex; align-items:stretch; gap:10px; flex-wrap:wrap; justify-content:center; }
+  .node { flex:1; min-width:150px; background:#1d2236; border:1px solid #313861; border-radius:12px;
+          padding:14px; text-align:center; }
+  .node .ico { font-size:1.6rem; }
+  .node .nm { font-weight:700; margin:4px 0; }
+  .node .fn { font-family:monospace; font-size:.75rem; color:#7cc4ff; }
+  .node .opt { font-size:.72rem; color:#888fa8; margin-top:4px; }
+  .arrow { display:flex; align-items:center; color:#ff6b8b; font-size:1.5rem; font-weight:700; }
+  @media(max-width:760px){ .arrow{ transform:rotate(90deg); } .node{min-width:100%;} }
+
+  /* ── table ── */
+  table { width:100%; border-collapse:collapse; font-size:.9rem; }
+  th,td { text-align:left; padding:11px 12px; border-bottom:1px solid #2a2f48; vertical-align:top; }
+  th { color:#9aa0b4; font-weight:600; font-size:.82rem; text-transform:uppercase; letter-spacing:.04em;}
+  td code { background:#0f1220; border:1px solid #2a2f48; padding:1px 6px; border-radius:5px;
+            color:#7cc4ff; font-size:.82rem; }
+  .why { color:#cdd2e4; }
+
+  .legend { display:flex; gap:16px; flex-wrap:wrap; margin-top:10px; font-size:.8rem; color:#9aa0b4;}
+  .legend span { display:flex; align-items:center; gap:5px; }
+  .dot { width:10px; height:10px; border-radius:3px; display:inline-block; }
+</style>
+</head>
+<body>
+<div class="wrap">
+
+  <h1>🎯 補習主動搵客工具</h1>
+  <div class="sub">Phase 0 MVP ・ 監察 Threads → AI 識別搵補習嘅人(避開同行)→ 半自動審核回覆</div>
+
+  <!-- 檔案樹 -->
+  <h2>📁 專案結構</h2>
+  <div class="card">
+    <div class="tree">
+<span class="dir">html-protfolio/</span>
+<span class="branch">├─ </span><span class="dir">docs/</span>
+<span class="branch">│   └─ </span><span class="file">tutoring-lead-gen-design.md</span><span class="tag t-design">設計文件</span><br>
+<span class="branch">│      </span><span class="desc">技術方案 + 架構圖</span>
+<span class="branch">└─ </span><span class="dir">tutoring-leadgen/</span><span class="desc">  ← MVP 程式</span>
+<span class="branch">    ├─ </span><span class="file">README.md</span><span class="desc">         點 setup / 跑 / 接真數據</span>
+<span class="branch">    ├─ </span><span class="file">requirements.txt</span><span class="desc">  依賴套件</span>
+<span class="branch">    ├─ </span><span class="file">.env.example</span><span class="tag t-cfg">設定</span><span class="desc">   複製做 .env 填 key</span>
+<span class="branch">    ├─ </span><span class="file">.gitignore</span><span class="desc">        擋 .env / *.db</span>
+<span class="branch">    │</span>
+<span class="branch">    ├─ </span><span class="file">config.py</span><span class="tag t-cfg">設定</span><span class="desc">      讀 .env,集中設定</span>
+<span class="branch">    ├─ </span><span class="file">scraper.py</span><span class="tag t-core">爬文層</span><span class="desc">   mock / apify → fetch_posts()</span>
+<span class="branch">    ├─ </span><span class="file">llm.py</span><span class="tag t-core">分析層</span><span class="desc">       mock / gemini / openrouter</span>
+<span class="branch">    ├─ </span><span class="file">db.py</span><span class="tag t-core">資料層</span><span class="desc">        SQLite 3 表 + 去重</span>
+<span class="branch">    ├─ </span><span class="file">pipeline.py</span><span class="tag t-core">主流程</span><span class="desc">  爬→去重→分析→入庫</span>
+<span class="branch">    ├─ </span><span class="file">app.py</span><span class="tag t-ui">UI</span><span class="desc">          Streamlit 半自動審核台</span>
+<span class="branch">    │</span>
+<span class="branch">    ├─ </span><span class="file">preview.html</span><span class="desc">      審核台 UI preview</span>
+<span class="branch">    └─ </span><span class="file">structure.html</span><span class="desc">    (你而家睇緊呢個)</span>
+    </div>
+    <div class="legend">
+      <span><span class="dot" style="background:#c4b5ff"></span>設計文件</span>
+      <span><span class="dot" style="background:#8ce0a8"></span>核心程式</span>
+      <span><span class="dot" style="background:#ffcd8c"></span>設定</span>
+      <span><span class="dot" style="background:#ff9ec0"></span>UI</span>
+    </div>
+  </div>
+
+  <!-- 資料流 -->
+  <h2>🔄 資料流</h2>
+  <div class="card">
+    <div class="flow">
+      <div class="node">
+        <div class="ico">🕷️</div><div class="nm">爬文</div>
+        <div class="fn">scraper.py</div>
+        <div class="opt">mock / apify</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node">
+        <div class="ico">🧹</div><div class="nm">去重</div>
+        <div class="fn">db.py</div>
+        <div class="opt">post_id 唯一</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node">
+        <div class="ico">🤖</div><div class="nm">AI 分析</div>
+        <div class="fn">llm.py</div>
+        <div class="opt">mock / gemini / openrouter</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node">
+        <div class="ico">💾</div><div class="nm">入庫</div>
+        <div class="fn">leadgen.db</div>
+        <div class="opt">posts·analysis·replies</div>
+      </div>
+      <div class="arrow">→</div>
+      <div class="node" style="border-color:#ff6b8b;">
+        <div class="ico">👀</div><div class="nm">半自動審核</div>
+        <div class="fn">app.py</div>
+        <div class="opt">人手 review → 發送</div>
+      </div>
+    </div>
+    <p style="margin-top:16px; color:#9aa0b4; font-size:.85rem;">
+      <code style="background:#0f1220;padding:2px 6px;border-radius:5px;color:#8ce0a8;">python pipeline.py</code>
+      跑前 4 步入庫　→
+      <code style="background:#0f1220;padding:2px 6px;border-radius:5px;color:#ff9ec0;">streamlit run app.py</code>
+      開最後一步審核台
+    </p>
+  </div>
+
+  <!-- 設計理念 -->
+  <h2>💡 設計理念(對應你嘅需求)</h2>
+  <div class="card">
+    <table>
+      <tr><th>檔案</th><th>點解咁設計</th></tr>
+      <tr>
+        <td><code>scraper.py</code><br><code>llm.py</code></td>
+        <td class="why"><b>Provider 抽象</b>:各有 <code>mock</code> 模式(免 key 即跑),真嘅換 <code>.env</code> 一個值就切。
+        將來由 Gemini 轉 OpenRouter <b>唔使改 code</b>。</td>
+      </tr>
+      <tr>
+        <td><code>db.py</code></td>
+        <td class="why"><code>post_id</code> 做 primary key → <b>自動去重</b>,唔會重複處理 / 重複回覆。
+        三表分開 = 原文、AI 判斷、回覆狀態各自清晰。</td>
+      </tr>
+      <tr>
+        <td><code>app.py</code></td>
+        <td class="why"><b>半自動核心</b>:只顯示「搵緊補習 + 非同行 + score ≥ 門檻」嘅 lead;
+        撳掣只係<b>標記</b>,唔自動 post(避封號)。</td>
+      </tr>
+      <tr>
+        <td><code>config.py</code></td>
+        <td class="why">所有 key / 門檻 / 關鍵詞集中一處,方便調。</td>
+      </tr>
+    </table>
+  </div>
+
+  <p style="text-align:center; color:#5a6080; font-size:.8rem; margin-top:30px;">
+    branch: claude/tutoring-lead-gen-tool-TYJMj
+  </p>
+
+</div>
+</body>
+</html>
