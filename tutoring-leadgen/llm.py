@@ -1,6 +1,6 @@
-"""LLM 分析層（provider 抽象）。
+"""LLM 分析層（provider 抽象 + retry + schema 正規化）。
 
-analyze_post(text) -> dict，固定 schema：
+analyze_post(text, author_handle) -> (dict, model_str)，固定 schema：
   is_tutoring_related, intent, subject, level, region,
   is_competitor, is_advertisement, lead_score, reason, suggested_reply
 
@@ -8,14 +8,17 @@ Provider：
   mock       — 關鍵詞啟發式，唔使 key，即刻 demo
   gemini     — Google Gemini（OpenAI-compatible endpoint）
   openrouter — OpenRouter（將來轉去淨係改 config）
-
-gemini / openrouter 兩者都用同一個 OpenAI-compatible client，
-所以轉 provider 只係換 base_url / api_key / model。
 """
 import json
-from typing import Tuple
+import logging
+import time
+from typing import Optional, Tuple
 
 import config
+
+log = logging.getLogger("leadgen.llm")
+
+INTENTS = {"looking_for_tutor", "selling_tutoring", "discussion", "not_related"}
 
 SYSTEM_PROMPT = """你係一個補習中介嘅銷售助手。你會收到一則社交平台 (Threads) 嘅 post，
 要判斷佢同「補習 / 搵補習老師」嘅關係，幫公司主動搵客，但要避開同行。
@@ -34,16 +37,46 @@ SYSTEM_PROMPT = """你係一個補習中介嘅銷售助手。你會收到一則�
 - is_advertisement (bool): 係咪廣告/自我推銷
 - lead_score (number): 0~1，幾大機會係值得跟進嘅真客
 - reason (string): 一句中文解釋你嘅判斷
-- suggested_reply (string): 如果係 looking_for_tutor，寫一句友善、唔硬銷嘅中文回覆草稿；否則 ""
+- suggested_reply (string): 如果係 looking_for_tutor，寫一句友善、唔硬銷、口語化嘅中文回覆草稿；否則 ""
 
 只輸出 JSON，唔好有其他文字。"""
 
 
-def analyze_post(text: str) -> Tuple[dict, str]:
+def analyze_post(text: str, author_handle: Optional[str] = None) -> Tuple[dict, str]:
     """回傳 (分析結果 dict, 用咗邊個 model 字串)。"""
     if config.LLM_PROVIDER == "mock":
-        return _analyze_mock(text), "mock-heuristic"
-    return _analyze_openai_compatible(text)
+        data, model = _analyze_mock(text), "mock-heuristic"
+    else:
+        data, model = _analyze_openai_compatible(text)
+
+    data = _normalize(data)
+    # 黑名單 handle：直接覆寫成同行，唔理 AI 點判
+    if author_handle and author_handle.lstrip("@").lower() in config.load_competitors():
+        data["is_competitor"] = True
+        data["intent"] = "selling_tutoring"
+        data["reason"] = "喺同行黑名單"
+    return data, model
+
+
+def _normalize(d: dict) -> dict:
+    """保證所有欄位齊全 + 型別正確 + lead_score 夾喺 0~1，
+    令 model 偶爾漏欄位都唔會搞冧 pipeline。"""
+    out = {
+        "is_tutoring_related": bool(d.get("is_tutoring_related", False)),
+        "intent": d.get("intent") if d.get("intent") in INTENTS else "not_related",
+        "subject": str(d.get("subject") or ""),
+        "level": str(d.get("level") or ""),
+        "region": str(d.get("region") or ""),
+        "is_competitor": bool(d.get("is_competitor", False)),
+        "is_advertisement": bool(d.get("is_advertisement", False)),
+        "reason": str(d.get("reason") or ""),
+        "suggested_reply": str(d.get("suggested_reply") or ""),
+    }
+    try:
+        out["lead_score"] = max(0.0, min(1.0, float(d.get("lead_score", 0))))
+    except (TypeError, ValueError):
+        out["lead_score"] = 0.0
+    return out
 
 
 def _client_and_model():
@@ -69,31 +102,46 @@ def _client_and_model():
     raise RuntimeError(f"未知 LLM_PROVIDER: {config.LLM_PROVIDER}")
 
 
-def _analyze_openai_compatible(text: str) -> Tuple[dict, str]:
+def _analyze_openai_compatible(text: str, max_retries: int = 3) -> Tuple[dict, str]:
     client, model = _client_and_model()
-    resp = client.chat.completions.create(
-        model=model,
-        messages=[
-            {"role": "system", "content": SYSTEM_PROMPT},
-            {"role": "user", "content": text},
-        ],
-        temperature=0.2,
-        response_format={"type": "json_object"},
-    )
-    raw = resp.choices[0].message.content
+    last_err = None
+    for attempt in range(1, max_retries + 1):
+        try:
+            resp = client.chat.completions.create(
+                model=model,
+                messages=[
+                    {"role": "system", "content": SYSTEM_PROMPT},
+                    {"role": "user", "content": text},
+                ],
+                temperature=0.2,
+                response_format={"type": "json_object"},
+            )
+            return _parse_json(resp.choices[0].message.content), model
+        except Exception as e:  # noqa: BLE001  網絡/額度/parse 都喺度兜底
+            last_err = e
+            wait = 2 ** attempt
+            log.warning("LLM 第 %d 次失敗:%s（%ds 後重試）", attempt, e, wait)
+            if attempt < max_retries:
+                time.sleep(wait)
+    raise RuntimeError(f"LLM 連續 {max_retries} 次失敗:{last_err}")
+
+
+def _parse_json(raw: Optional[str]) -> dict:
+    if not raw:
+        raise ValueError("LLM 回傳空白")
     try:
-        data = json.loads(raw)
+        return json.loads(raw)
     except (json.JSONDecodeError, TypeError):
-        # 萬一 model 包咗 markdown code fence，抽返中間
-        raw2 = raw.strip().strip("`")
-        raw2 = raw2[raw2.find("{"): raw2.rfind("}") + 1]
-        data = json.loads(raw2)
-    return data, model
+        # 萬一包咗 markdown code fence，抽返中間 { ... }
+        s = raw.strip().strip("`")
+        s = s[s.find("{"): s.rfind("}") + 1]
+        return json.loads(s)
 
 
 # ── Mock 啟發式：唔使任何 key，即刻 demo 到 ──
-_LOOKING = ["搵補習", "搵緊補習", "求補習", "想搵", "邊個補", "補得好", "請問點搵", "搵個補習", "搵tutor", "搵 tutor"]
-_SELLING = ["報名", "首堂", "半價", "名額", "whatsapp", "狀元", "本中心", "招生", "🔥"]
+_LOOKING = ["搵補習", "搵緊補習", "求補習", "想搵", "邊個補", "補得好", "請問點搵",
+            "搵個補習", "搵tutor", "搵 tutor", "有冇推介", "推介"]
+_SELLING = ["報名", "首堂", "半價", "名額", "whatsapp", "狀元", "本中心", "招生", "🔥", "即時報名"]
 _SUBJECTS = {
     "數學": "數學", "math": "數學", "英文": "英文", "english": "英文",
     "中文": "中文", "物理": "物理", "phonics": "Phonics", "中英數": "中英數",

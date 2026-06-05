@@ -44,6 +44,17 @@ CREATE TABLE IF NOT EXISTS replies (
     final_reply TEXT,
     sent_at     TEXT
 );
+
+CREATE INDEX IF NOT EXISTS idx_analysis_intent ON analysis(intent);
+CREATE INDEX IF NOT EXISTS idx_analysis_score  ON analysis(lead_score);
+CREATE INDEX IF NOT EXISTS idx_replies_status  ON replies(status);
+"""
+
+_LEAD_COLS = """
+    p.post_id, p.author_handle, p.content, p.url, p.posted_at,
+    a.intent, a.subject, a.level, a.region, a.lead_score,
+    a.reason, a.suggested_reply, a.is_competitor, a.is_advertisement,
+    r.status, r.final_reply
 """
 
 
@@ -69,6 +80,13 @@ def post_exists(post_id: str) -> bool:
             "SELECT 1 FROM posts WHERE post_id = ?", (post_id,)
         ).fetchone()
         return row is not None
+
+
+def is_analyzed(post_id: str) -> bool:
+    with get_conn() as conn:
+        return conn.execute(
+            "SELECT 1 FROM analysis WHERE post_id = ?", (post_id,)
+        ).fetchone() is not None
 
 
 def insert_post(post: dict):
@@ -111,36 +129,74 @@ def save_analysis(post_id: str, a: dict, model: str):
                 model,
             ),
         )
-        # 每條分析過嘅 post 都開一行 reply（pending）
+        # 每條分析過嘅 post 都開一行 reply(pending),re-analyze 唔會洗走已有狀態
         conn.execute(
             "INSERT OR IGNORE INTO replies (post_id, status) VALUES (?, 'pending')",
             (post_id,),
         )
 
 
-def get_leads(status: str = "pending", min_score: Optional[float] = None):
-    """攞符合搵客條件嘅 leads，按 lead_score 由高到低。"""
+def get_lead(post_id: str) -> Optional[dict]:
+    with get_conn() as conn:
+        row = conn.execute(
+            f"""SELECT {_LEAD_COLS}
+                FROM posts p
+                JOIN analysis a ON a.post_id = p.post_id
+                JOIN replies  r ON r.post_id = p.post_id
+                WHERE p.post_id = ?""",
+            (post_id,),
+        ).fetchone()
+        return dict(row) if row else None
+
+
+def get_leads(
+    status: str = "pending",
+    min_score: Optional[float] = None,
+    subject: Optional[str] = None,
+    search: Optional[str] = None,
+):
+    """攞符合搵客條件嘅 leads,按 lead_score 由高到低。"""
     if min_score is None:
         min_score = config.LEAD_SCORE_THRESHOLD
+
+    where = [
+        "r.status = ?",
+        "a.is_tutoring = 1",
+        "a.intent = 'looking_for_tutor'",
+        "a.is_competitor = 0",
+        "a.is_advertisement = 0",
+        "a.lead_score >= ?",
+    ]
+    params: list = [status, min_score]
+    if subject:
+        where.append("a.subject = ?")
+        params.append(subject)
+    if search:
+        where.append("(p.content LIKE ? OR p.author_handle LIKE ?)")
+        params.extend([f"%{search}%", f"%{search}%"])
+
     with get_conn() as conn:
         rows = conn.execute(
-            """SELECT p.post_id, p.author_handle, p.content, p.url, p.posted_at,
-                      a.intent, a.subject, a.level, a.region, a.lead_score,
-                      a.reason, a.suggested_reply,
-                      r.status, r.final_reply
-               FROM posts p
-               JOIN analysis a ON a.post_id = p.post_id
-               JOIN replies  r ON r.post_id = p.post_id
-               WHERE r.status = ?
-                 AND a.is_tutoring = 1
-                 AND a.intent = 'looking_for_tutor'
-                 AND a.is_competitor = 0
-                 AND a.is_advertisement = 0
-                 AND a.lead_score >= ?
-               ORDER BY a.lead_score DESC""",
-            (status, min_score),
+            f"""SELECT {_LEAD_COLS}
+                FROM posts p
+                JOIN analysis a ON a.post_id = p.post_id
+                JOIN replies  r ON r.post_id = p.post_id
+                WHERE {' AND '.join(where)}
+                ORDER BY a.lead_score DESC, p.posted_at DESC""",
+            params,
         ).fetchall()
         return [dict(r) for r in rows]
+
+
+def lead_subjects() -> list[str]:
+    """所有 lead 出現過嘅科目(畀 dashboard 做 filter)。"""
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT DISTINCT subject FROM analysis
+               WHERE intent='looking_for_tutor' AND subject != ''
+               ORDER BY subject"""
+        ).fetchall()
+        return [r[0] for r in rows]
 
 
 def update_reply(post_id: str, status: str, final_reply: str = None):
@@ -152,6 +208,33 @@ def update_reply(post_id: str, status: str, final_reply: str = None):
                WHERE post_id = ?""",
             (status, final_reply, status, post_id),
         )
+
+
+def save_draft(post_id: str, draft: str):
+    """淨係儲草稿,唔改狀態(畀 dashboard「儲返先」用)。"""
+    with get_conn() as conn:
+        conn.execute(
+            "UPDATE replies SET final_reply = ? WHERE post_id = ?",
+            (draft, post_id),
+        )
+
+
+def intent_breakdown() -> dict:
+    with get_conn() as conn:
+        rows = conn.execute(
+            "SELECT intent, COUNT(*) FROM analysis GROUP BY intent"
+        ).fetchall()
+        return {r[0]: r[1] for r in rows}
+
+
+def subject_breakdown() -> dict:
+    with get_conn() as conn:
+        rows = conn.execute(
+            """SELECT subject, COUNT(*) FROM analysis
+               WHERE intent='looking_for_tutor' AND subject != ''
+               GROUP BY subject ORDER BY COUNT(*) DESC"""
+        ).fetchall()
+        return {r[0]: r[1] for r in rows}
 
 
 def stats() -> dict:

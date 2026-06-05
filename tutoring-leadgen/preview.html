@@ -41,6 +41,11 @@
   .hint { color:#9a9ca3; font-size:.78rem; }
   .badge { display:inline-block; background:#fff0f3; color:#ff4b6e; border:1px solid #ffd0da;
            border-radius:20px; padding:2px 10px; font-size:.72rem; font-weight:600; }
+  .tabs { display:flex; gap:6px; border-bottom:1px solid #e6e6e6; margin:18px 0 4px; }
+  .tab { padding:8px 16px; font-size:.92rem; color:#808495; cursor:default; }
+  .tab.active { color:#ff4b6e; border-bottom:2px solid #ff4b6e; font-weight:600; }
+  .copy { background:#f6f7f9; border:1px solid #e6e6e6; border-radius:8px; padding:8px 12px;
+          font-size:.8rem; color:#555; margin-top:8px; display:flex; justify-content:space-between; }
 </style>
 </head>
 <body>
@@ -59,13 +64,21 @@
     <div class="metric"><div class="label">已忽略</div><div class="value">0</div></div>
   </div>
 
+  <div class="tabs">
+    <div class="tab active">📋 審核 leads</div>
+    <div class="tab">📊 分析</div>
+    <div class="tab">⚙️ 設定</div>
+  </div>
+
   <hr class="divider">
 
   <div class="toolbar">
     <h2>符合條件嘅 leads:3 個</h2>
     <div class="filters">
-      <span class="pill">顯示狀態 ▾ ⏳ 待審核</span>
-      <span class="pill">最低 lead score ▾ 0.70</span>
+      <span class="pill">狀態 ▾ ⏳ 待審核</span>
+      <span class="pill">最低 score ▾ 0.70</span>
+      <span class="pill">科目 ▾ 全部</span>
+      <span class="pill">🔎 搜尋內容 / 作者</span>
     </div>
   </div>
 
@@ -80,11 +93,14 @@
     <div class="ai">🤖 AI 判斷:啟發式判斷:intent=looking_for_tutor　<span class="badge">🎯 目標客</span></div>
     <label class="fld">回覆草稿(可改)</label>
     <textarea rows="2">你好~見到你想搵數學嘅補習老師。我哋有經驗豐富、專補中三數學嘅老師，可以按學生程度配對，想了解多啲歡迎 DM 我哋傾下 😊</textarea>
+    <div class="copy"><span>📋 一鍵複製草稿(右上角 copy icon)</span><span>⧉</span></div>
     <div class="btns">
-      <button class="primary">✅ 標記已發送</button>
+      <button class="ghost">↗ 開原 post</button>
+      <button class="ghost">♻️ 重新生成</button>
+      <button class="primary">✅ 已發送</button>
       <button class="ghost">🚫 忽略</button>
-      <span class="hint">「標記已發送」唔會自動 post;請複製上面草稿,親自去原 post 回覆(避封號)。</span>
     </div>
+    <div class="hint" style="margin-top:6px;">「已發送」唔會自動 post;請複製草稿親自去原 post 回覆(避封號)。</div>
   </div>
 
   <!-- Lead 2 -->
@@ -98,11 +114,14 @@
     <div class="ai">🤖 AI 判斷:啟發式判斷:intent=looking_for_tutor　<span class="badge">🎯 目標客</span></div>
     <label class="fld">回覆草稿(可改)</label>
     <textarea rows="2">你好~見到你想搵英文嘅補習老師。我哋有經驗豐富、專補DSE英文嘅老師，可以按學生程度配對，想了解多啲歡迎 DM 我哋傾下 😊</textarea>
+    <div class="copy"><span>📋 一鍵複製草稿(右上角 copy icon)</span><span>⧉</span></div>
     <div class="btns">
-      <button class="primary">✅ 標記已發送</button>
+      <button class="ghost">↗ 開原 post</button>
+      <button class="ghost">♻️ 重新生成</button>
+      <button class="primary">✅ 已發送</button>
       <button class="ghost">🚫 忽略</button>
-      <span class="hint">「標記已發送」唔會自動 post;請複製上面草稿,親自去原 post 回覆(避封號)。</span>
     </div>
+    <div class="hint" style="margin-top:6px;">「已發送」唔會自動 post;請複製草稿親自去原 post 回覆(避封號)。</div>
   </div>
 
   <!-- Lead 3 -->
@@ -116,11 +135,14 @@
     <div class="ai">🤖 AI 判斷:啟發式判斷:intent=looking_for_tutor　<span class="badge">🎯 目標客</span></div>
     <label class="fld">回覆草稿(可改)</label>
     <textarea rows="2">你好~見到你想搵中英數嘅補習老師。我哋有經驗豐富、專補小三中英數嘅老師，可以按學生程度配對，想了解多啲歡迎 DM 我哋傾下 😊</textarea>
+    <div class="copy"><span>📋 一鍵複製草稿(右上角 copy icon)</span><span>⧉</span></div>
     <div class="btns">
-      <button class="primary">✅ 標記已發送</button>
+      <button class="ghost">↗ 開原 post</button>
+      <button class="ghost">♻️ 重新生成</button>
+      <button class="primary">✅ 已發送</button>
       <button class="ghost">🚫 忽略</button>
-      <span class="hint">「標記已發送」唔會自動 post;請複製上面草稿,親自去原 post 回覆(避封號)。</span>
     </div>
+    <div class="hint" style="margin-top:6px;">「已發送」唔會自動 post;請複製草稿親自去原 post 回覆(避封號)。</div>
   </div>
 </body>
 </html>
