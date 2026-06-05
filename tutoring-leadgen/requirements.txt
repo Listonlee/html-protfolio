@@ -1,0 +1,9 @@
+# 核心(MVP 必要)
+streamlit>=1.30      # 半自動審核 UI
+python-dotenv>=1.0   # 讀 .env
+
+# LLM(用 gemini / openrouter 時先需要;mock 模式唔使)
+openai>=1.0          # 統一用 OpenAI-compatible client 接 Gemini / OpenRouter
+
+# 爬文(用 apify 時先需要;mock 模式唔使)
+apify-client>=1.6

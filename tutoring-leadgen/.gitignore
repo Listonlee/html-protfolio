@@ -1,0 +1,9 @@
+# ── 一律唔好 commit ──
+.env
+*.db
+*.sqlite3
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
