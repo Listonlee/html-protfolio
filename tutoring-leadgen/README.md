@@ -1,115 +1,85 @@
-# 補習主動搵客工具 — MVP
+# 補習主動搵客工具 — 團隊 Web App
 
-監察 Threads 上嘅 post → AI 識別「搵緊補習」嘅人(同時避開同行)→ 入庫 →
-喺一個審核 UI **半自動**跟進(AI 出草稿,你 review、複製、親自發送)。
+監察 Threads → AI 識別「搵緊補習」嘅人(避開同行)→ 入庫 →
+團隊登入,喺審核台**半自動**跟進(AI 出草稿,你 review、複製、親自發送)。
 
-> 設計理念見 [`../docs/tutoring-lead-gen-design.md`](../docs/tutoring-lead-gen-design.md)。
-> **半自動** = 工具負責搵客 + 草擬,**唔會自動 post**(避封號),最後一步由你親自發。
+> **架構**:FastAPI + Jinja2(一個 container)・ SQLAlchemy(本機 SQLite / 上雲 Postgres)・ 認證(email + 密碼 + 角色)
+> **部署**:Docker → Google Cloud Run。詳細步驟見 [`DEPLOY.md`](DEPLOY.md)。
+> **半自動**:工具負責搵客 + 草擬,**唔會自動 post**(避封號),最後一步團隊親自發。
 
-## 即刻試(唔使任何 API key)
+## 本機快速試(唔使任何 key)
 
 ```bash
 cd tutoring-leadgen
 pip install -r requirements.txt
-cp .env.example .env          # 預設 mock 模式,唔使填 key
+cp .env.example .env          # 預設 mock + SQLite,唔使填 key
 
-python pipeline.py check      # 驗證設定 + 測連線
-python pipeline.py run        # 爬(樣本)→ 分析 → 入庫
-streamlit run app.py          # 開審核 UI
+python -m scripts.seed        # 建立管理員 + 範例資料(讀 .env 嘅 ADMIN_*)
+python -m scripts.run_pipeline  # 爬(樣本)→ 分析 → 入庫
+uvicorn app.main:app --reload   # 開 http://localhost:8000
 ```
 
-mock 模式用內置樣本 post + 關鍵詞啟發式分類,等你即刻見到成個流程點 work。
+瀏覽器入 `http://localhost:8000` → 用 `.env` 裏 `ADMIN_EMAIL` / `ADMIN_PASSWORD` 登入。
 
-## CLI
+## 功能
 
-| 指令 | 作用 |
+- **登入認證**:email + 密碼(pbkdf2 雜湊)、session cookie、角色(admin / member)。
+- **審核台**:按 score 排序 leads;狀態 / 科目 / 搜尋 篩選;改草稿、重新生成、開原 post、揀回覆帳號、標記已發送 / 忽略。
+- **帳號設定(admin)**:管理多個 **Threads 回覆帳號**(設預設)、**團隊成員**、**同行黑名單**。
+- **分析**:意圖分佈、熱門科目、發送率。
+- **立即爬文**:admin 可喺審核台一鍵觸發 pipeline。
+
+## 角色
+
+| 角色 | 可做 |
 |------|------|
-| `python pipeline.py run` | 爬 → 去重 → 分析 → 入庫 |
-| `python pipeline.py run --limit 20` | 只處理頭 20 條 |
-| `python pipeline.py run --dry-run` | 只分析、唔入庫(試效果) |
-| `python pipeline.py run --reanalyze` | 連已分析過嘅都重做 |
-| `python pipeline.py check` | 驗證設定 + 測 Apify / LLM 連線 |
-| `python pipeline.py stats` | 睇累計統計 + 意圖/科目分佈 |
-| `python test_logic.py` | 跑核心邏輯測試(免 key) |
+| **admin**(主帳號) | 全部:審核、管理 Threads 帳號 / 團隊成員 / 黑名單、觸發爬文 |
+| **member**(團隊成員) | 審核 leads、回覆、睇分析 |
 
-## 接真數據(填 key 就轉)
+## Provider 切換(改 `.env` / 環境變數)
 
-改 `.env`:
+| | mock(預設) | 真 |
+|---|---|---|
+| 爬文 | 內置樣本 | `SCRAPER_PROVIDER=apify` + `APIFY_API_TOKEN` |
+| LLM | 關鍵詞啟發式 | `LLM_PROVIDER=gemini` + `GEMINI_API_KEY`(或 `openrouter`) |
 
-```ini
-# 真係爬 Threads
-SCRAPER_PROVIDER=apify
-APIFY_API_TOKEN=你的_token
-APIFY_ACTOR=apify/threads-scraper   # 換成你揀嗰隻 actor
+## 排程(每日自動爬)
 
-# 用 Google Gemini 分析
-LLM_PROVIDER=gemini
-GEMINI_API_KEY=你的_key
+兩種方式:
+1. **Cloud Scheduler** → `POST /tasks/run`,帶 header `X-Pipeline-Token: <PIPELINE_TOKEN>`(見 DEPLOY.md)。
+2. 本機 cron:`python -m scripts.run_pipeline`。
 
-# 將來轉 OpenRouter:淨係改呢三行,prompt/schema 都唔使郁
-# LLM_PROVIDER=openrouter
-# OPENROUTER_API_KEY=...
-# OPENROUTER_MODEL=google/gemini-2.0-flash-001
-```
-
-填完跑 `python pipeline.py check` 確認爬文同 LLM 都通,先至 `run`。
-
-> ⚠️ 唔同 Apify actor 嘅 output 欄位名可能唔同。`scraper.py` 嘅 `_map_item()`
-> 已經有多個 fallback 欄位,但用真 actor 前最好對返佢嘅文件核實 mapping。
-
-## 審核台功能(`streamlit run app.py`)
-
-- **📋 審核**:按 score 排序嘅 leads;狀態 / 科目 / 搜尋 篩選;
-  可改草稿、**一鍵複製**、**♻️ 重新生成**、**↗ 開原 post**、**✅ 已發送 / 🚫 忽略**。
-- **📊 分析**:意圖分佈、熱門科目、發送率圖表。
-- **⚙️ 設定**:睇目前設定、設定檢查、**管理同行黑名單**。
-
-## 搵客 / 避同行邏輯
-
-一條 post 會喺審核台出現,當且僅當:
+## 結構
 
 ```
-is_tutoring_related == true
-AND intent == "looking_for_tutor"      # 搵緊補習(唔係賣補習)
-AND is_competitor == false             # 避開同行(AI + 黑名單雙重)
-AND is_advertisement == false
-AND lead_score >= LEAD_SCORE_THRESHOLD # 預設 0.7
+app/
+├── main.py            # FastAPI 路由(登入 / 審核 / 帳號 / 觸發)
+├── config.py          # 環境變數設定
+├── database.py        # SQLAlchemy 引擎(SQLite / Postgres)
+├── models.py          # User / ThreadsAccount / Competitor / Post / Analysis / Reply
+├── auth.py            # 密碼雜湊 + session 守衛
+├── crud.py            # DB 操作
+├── services/
+│   ├── scraper.py     # mock / apify
+│   ├── llm.py         # mock / gemini / openrouter
+│   └── pipeline.py    # 爬→分析→入庫
+├── templates/         # login / dashboard / analytics / accounts
+└── static/style.css
+scripts/
+├── seed.py            # 建立管理員 + 範例資料
+└── run_pipeline.py    # CLI 觸發 pipeline(cron 用)
+tests/test_logic.py    # 核心邏輯測試
+Dockerfile             # Cloud Run 部署
 ```
 
-避同行有**兩層**:AI 判斷 + `competitors.txt` handle 黑名單(黑名單會強制覆寫成同行)。
+## 測試
 
-## 可靠性
-
-- LLM / Apify 呼叫都有 **retry + exponential backoff**。
-- 單條 post 分析失敗**唔會搞冧成個 run**(記低 error 繼續)。
-- `post_id` 去重,重跑唔會重複處理 / 重複回覆。
-- 所有欄位經 `_normalize()` 保證齊全,`lead_score` 夾喺 0~1。
-
-## 每日自動跑(可選)
-
-本機 crontab(每日 9am 爬一次):
-
-```cron
-0 9 * * * cd /path/to/tutoring-leadgen && /usr/bin/python3 pipeline.py run >> cron.log 2>&1
+```bash
+python -m tests.test_logic
 ```
-
-跑完開 `streamlit run app.py` 審核當日 leads。
-
-## 檔案結構
-
-| 檔案 | 作用 |
-|------|------|
-| `config.py` | 讀 `.env`、logging、設定驗證、黑名單 |
-| `scraper.py` | 爬文層(`mock` / `apify`)+ retry + 欄位 mapping |
-| `llm.py` | LLM 分析層(`mock` / `gemini` / `openrouter`)+ retry + schema 正規化 |
-| `db.py` | SQLite:posts / analysis / replies + 去重 + 查詢/分析 |
-| `pipeline.py` | CLI:`run` / `check` / `stats` |
-| `app.py` | Streamlit 審核 UI(3 分頁) |
-| `competitors.txt` | 同行黑名單 |
-| `test_logic.py` | 核心邏輯測試 |
 
 ## ⚠️ 注意
 
-- 爬文可能違反平台 ToS,自行評估風險;建議低頻、唔好濫用。
-- **唔自動 post**:確認後請複製草稿,親自去原 post 回覆。
-- `.env` / `*.db` 已 gitignore,唔好 commit key 同數據。
+- 爬文可能違反平台 ToS,自行評估;低頻使用。
+- **唔自動 post**:確認後請親自去原 post 回覆。
+- `.env` / `*.db` 已 gitignore。部署用嘅 secret 放 Cloud Run 環境變數 / Secret Manager,唔好入 git。

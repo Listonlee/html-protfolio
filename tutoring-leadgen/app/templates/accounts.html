@@ -1,0 +1,74 @@
+{% extends "base.html" %}
+{% set active = 'accounts' %}
+{% block content %}
+<h2 class="section">⚙️ 帳號設定</h2>
+
+{% if config_warnings %}
+<div class="alert">
+  {% for w in config_warnings %}<div>⚠️ {{ w }}</div>{% endfor %}
+</div>
+{% endif %}
+<p class="muted">目前 provider — 爬文:<code>{{ providers.scraper }}</code> · LLM:<code>{{ providers.llm }}</code>(由環境變數控制)</p>
+
+<!-- Threads 回覆帳號 -->
+<div class="card">
+  <h3>📱 Threads 回覆帳號(可管理多個)</h3>
+  <table>
+    <tr><th>Handle</th><th>名稱</th><th>狀態</th><th>預設</th><th></th></tr>
+    {% for acc in threads_accounts %}
+    <tr>
+      <td>@{{ acc.handle }}</td><td>{{ acc.display_name }}</td>
+      <td>{% if acc.is_active %}<span class="pill on">啟用</span>{% else %}<span class="pill">停用</span>{% endif %}</td>
+      <td>{% if acc.is_default %}★ 預設{% else %}
+        <form method="post" action="/accounts/threads/{{ acc.id }}/default" class="inline">
+          <button class="btn-ghost btn-xs">設預設</button></form>{% endif %}</td>
+      <td><form method="post" action="/accounts/threads/{{ acc.id }}/toggle" class="inline">
+        <button class="btn-ghost btn-xs">{% if acc.is_active %}停用{% else %}啟用{% endif %}</button></form></td>
+    </tr>
+    {% else %}<tr><td colspan="5" class="muted">未加帳號</td></tr>{% endfor %}
+  </table>
+  <form method="post" action="/accounts/threads/add" class="addrow">
+    <input name="handle" placeholder="handle(例 my_tutor_hk)" required>
+    <input name="display_name" placeholder="名稱(選填)">
+    <input name="notes" placeholder="備註(選填)">
+    <button class="btn-primary btn-sm">➕ 加帳號</button>
+  </form>
+</div>
+
+<!-- 團隊成員 -->
+<div class="card">
+  <h3>👥 團隊成員(登入帳號)</h3>
+  <table>
+    <tr><th>Email</th><th>名稱</th><th>角色</th><th>狀態</th></tr>
+    {% for u in users %}
+    <tr><td>{{ u.email }}</td><td>{{ u.name }}</td>
+      <td>{% if u.role=='admin' %}<span class="pill on">管理員</span>{% else %}成員{% endif %}</td>
+      <td>{% if u.is_active %}啟用{% else %}停用{% endif %}</td></tr>
+    {% endfor %}
+  </table>
+  <form method="post" action="/accounts/users/add" class="addrow">
+    <input name="email" type="email" placeholder="email" required>
+    <input name="name" placeholder="名稱">
+    <input name="password" type="password" placeholder="密碼" required>
+    <select name="role"><option value="member">成員</option><option value="admin">管理員</option></select>
+    <button class="btn-primary btn-sm">➕ 加成員</button>
+  </form>
+</div>
+
+<!-- 同行黑名單 -->
+<div class="card">
+  <h3>🚫 同行黑名單</h3>
+  <p class="muted">名單上嘅作者,即使 AI 判斷係搵補習都會被隔走。</p>
+  <div class="chips">
+    {% for c in competitors %}
+    <span class="chip">@{{ c.handle }}
+      <form method="post" action="/competitors/{{ c.id }}/remove" class="inline">
+        <button class="chip-x">×</button></form></span>
+    {% else %}<span class="muted">(空)</span>{% endfor %}
+  </div>
+  <form method="post" action="/competitors/add" class="addrow">
+    <input name="handle" placeholder="同行 handle" required>
+    <button class="btn-primary btn-sm">➕ 加入黑名單</button>
+  </form>
+</div>
+{% endblock %}

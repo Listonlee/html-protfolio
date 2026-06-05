@@ -1,0 +1,30 @@
+<!DOCTYPE html>
+<html lang="zh-HK">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>{% block title %}補習主動搵客{% endblock %}</title>
+  <link rel="stylesheet" href="/static/style.css">
+</head>
+<body>
+{% if user %}
+<nav class="nav">
+  <div class="nav-brand">🎯 補習搵客</div>
+  <div class="nav-links">
+    <a href="/" class="{% if active=='dashboard' %}on{% endif %}">📋 審核</a>
+    <a href="/analytics" class="{% if active=='analytics' %}on{% endif %}">📊 分析</a>
+    {% if user.role == 'admin' %}
+    <a href="/accounts" class="{% if active=='accounts' %}on{% endif %}">⚙️ 帳號設定</a>
+    {% endif %}
+  </div>
+  <div class="nav-user">
+    <span>{{ user.name or user.email }}{% if user.role=='admin' %} · 管理員{% endif %}</span>
+    <a href="/logout" class="btn-ghost btn-sm">登出</a>
+  </div>
+</nav>
+{% endif %}
+<main class="container">
+  {% block content %}{% endblock %}
+</main>
+</body>
+</html>

@@ -1,0 +1,33 @@
+{% extends "base.html" %}
+{% set active = 'analytics' %}
+{% block content %}
+<h2 class="section">📊 分析</h2>
+
+<div class="metrics">
+  <div class="metric"><span class="m-label">爬到 post</span><span class="m-val">{{ stats.posts }}</span></div>
+  <div class="metric"><span class="m-label">已發送</span><span class="m-val">{{ stats.sent }}</span></div>
+  <div class="metric"><span class="m-label">已忽略</span><span class="m-val">{{ stats.ignored }}</span></div>
+  <div class="metric"><span class="m-label">發送率</span><span class="m-val">{{ send_rate }}%</span></div>
+</div>
+
+{% set intent_label = {'looking_for_tutor':'🎯 搵補習','selling_tutoring':'🏢 同行','discussion':'💬 討論','not_related':'➖ 無關'} %}
+<div class="card">
+  <h3>意圖分佈</h3>
+  {% set imax = (intents.values()|list|max) if intents else 1 %}
+  {% for k, v in intents.items() %}
+  <div class="bar-row"><span class="bar-label">{{ intent_label.get(k, k) }}</span>
+    <span class="bar"><span class="bar-fill" style="width: {{ (v/imax*100)|round }}%"></span></span>
+    <span class="bar-val">{{ v }}</span></div>
+  {% else %}<p class="muted">未有數據,先去審核台撳「立即爬文」。</p>{% endfor %}
+</div>
+
+<div class="card">
+  <h3>熱門科目(搵補習)</h3>
+  {% set smax = (subjects.values()|list|max) if subjects else 1 %}
+  {% for k, v in subjects.items() %}
+  <div class="bar-row"><span class="bar-label">{{ k }}</span>
+    <span class="bar"><span class="bar-fill" style="width: {{ (v/smax*100)|round }}%"></span></span>
+    <span class="bar-val">{{ v }}</span></div>
+  {% else %}<p class="muted">未有科目數據。</p>{% endfor %}
+</div>
+{% endblock %}

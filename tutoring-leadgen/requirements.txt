@@ -1,9 +1,20 @@
-# 核心(MVP 必要)
-streamlit>=1.30      # 半自動審核 UI
-python-dotenv>=1.0   # 讀 .env
+# ── Web app ──
+fastapi>=0.110
+uvicorn[standard]>=0.27
+jinja2>=3.1
+python-multipart>=0.0.9      # 處理表單 POST
+itsdangerous>=2.1            # session cookie 簽名
+starlette>=0.36
 
-# LLM(用 gemini / openrouter 時先需要;mock 模式唔使)
-openai>=1.0          # 統一用 OpenAI-compatible client 接 Gemini / OpenRouter
+# ── 資料庫 ──
+SQLAlchemy>=2.0
+psycopg2-binary>=2.9         # Postgres 驅動(上雲用;本機 SQLite 唔需要都裝住)
 
-# 爬文(用 apify 時先需要;mock 模式唔使)
+# ── 設定 ──
+python-dotenv>=1.0
+
+# ── LLM(用 gemini / openrouter 時需要;mock 唔使）──
+openai>=1.0
+
+# ── 爬文(用 apify 時需要;mock 唔使）──
 apify-client>=1.6

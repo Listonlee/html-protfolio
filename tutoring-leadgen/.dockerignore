@@ -1,0 +1,14 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.env
+*.db
+*.sqlite3
+*.log
+.git/
+preview.html
+structure.html
+index.html
+README.md
+tests/

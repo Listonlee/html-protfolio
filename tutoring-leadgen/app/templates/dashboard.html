@@ -1,0 +1,79 @@
+{% extends "base.html" %}
+{% set active = 'dashboard' %}
+{% block content %}
+<div class="metrics">
+  <div class="metric"><span class="m-label">爬到 post</span><span class="m-val">{{ stats.posts }}</span></div>
+  <div class="metric"><span class="m-label">補習相關</span><span class="m-val">{{ stats.tutoring }}</span></div>
+  <div class="metric"><span class="m-label">同行(已避)</span><span class="m-val">{{ stats.competitors }}</span></div>
+  <div class="metric"><span class="m-label">待審核</span><span class="m-val">{{ stats.pending }}</span></div>
+  <div class="metric"><span class="m-label">已發送</span><span class="m-val">{{ stats.sent }}</span></div>
+  <div class="metric"><span class="m-label">已忽略</span><span class="m-val">{{ stats.ignored }}</span></div>
+</div>
+
+<div class="toolbar">
+  <form method="get" action="/" class="filters">
+    <select name="status" onchange="this.form.submit()">
+      <option value="pending" {% if status=='pending' %}selected{% endif %}>⏳ 待審核</option>
+      <option value="sent" {% if status=='sent' %}selected{% endif %}>✅ 已發送</option>
+      <option value="ignored" {% if status=='ignored' %}selected{% endif %}>🚫 已忽略</option>
+    </select>
+    <select name="subject" onchange="this.form.submit()">
+      <option value="">全部科目</option>
+      {% for s in subjects %}<option value="{{ s }}" {% if subject==s %}selected{% endif %}>{{ s }}</option>{% endfor %}
+    </select>
+    <input type="number" step="0.05" min="0" max="1" name="min_score" value="{{ '%.2f'|format(min_score) }}" title="最低 score">
+    <input type="text" name="search" value="{{ search }}" placeholder="🔎 搜尋內容 / 作者">
+    <button class="btn-ghost btn-sm">篩選</button>
+  </form>
+  {% if user.role == 'admin' %}
+  <form method="post" action="/tasks/run">
+    <button class="btn-primary btn-sm" title="即刻爬一次新 post">🔄 立即爬文</button>
+  </form>
+  {% endif %}
+</div>
+
+<h2 class="section">符合條件嘅 leads:{{ leads|length }} 個</h2>
+
+{% if not leads %}
+<div class="empty">暫時冇符合條件嘅 lead。撳「立即爬文」或調低門檻。</div>
+{% endif %}
+
+{% for lead in leads %}
+<div class="card">
+  <div class="card-head">
+    <div class="handle">{{ lead.author_handle or '(無 handle)' }}</div>
+    <div class="meta">科目 <code>{{ lead.subject or '—' }}</code> · 程度 <code>{{ lead.level or '—' }}</code></div>
+    <div class="score">{{ '%.2f'|format(lead.lead_score) }}</div>
+  </div>
+  <blockquote>{{ lead.content }}</blockquote>
+  <div class="ai">🤖 {{ lead.reason }} · {{ lead.posted_at }}</div>
+
+  {% if lead.status == 'pending' %}
+  <form method="post" action="/leads/{{ lead.post_id }}/action?{{ request.url.query }}" class="reply-form">
+    <textarea name="draft" rows="3">{{ lead.draft }}</textarea>
+    <div class="reply-actions">
+      {% if accounts %}
+      <select name="account" title="用邊個 Threads 帳號回覆">
+        {% for acc in accounts %}
+        <option value="{{ acc.handle }}" {% if acc.handle==default_account %}selected{% endif %}>@{{ acc.handle }}{% if acc.is_default %} ★{% endif %}</option>
+        {% endfor %}
+      </select>
+      {% else %}
+      <span class="warn-inline">⚠️ 未設回覆帳號(去帳號設定加)</span>
+      {% endif %}
+      {% if lead.url %}<a class="btn-ghost btn-sm" href="{{ lead.url }}" target="_blank">↗ 開原 post</a>{% endif %}
+      <button class="btn-ghost btn-sm" name="action" value="regenerate">♻️ 重新生成</button>
+      <button class="btn-ghost btn-sm" name="action" value="save">💾 儲草稿</button>
+      <button class="btn-primary btn-sm" name="action" value="send">✅ 標記已發送</button>
+      <button class="btn-ghost btn-sm" name="action" value="ignore">🚫 忽略</button>
+    </div>
+    <div class="hint">「標記已發送」唔會自動 post;請複製草稿親自去原 post 回覆(避封號)。</div>
+  </form>
+  {% else %}
+  <div class="final">回覆:{{ lead.draft }}</div>
+  <div class="ai">{% if lead.account_handle %}帳號 @{{ lead.account_handle }} · {% endif %}{{ lead.handled_by }}
+    {% if lead.url %} · <a href="{{ lead.url }}" target="_blank">↗ 原 post</a>{% endif %}</div>
+  {% endif %}
+</div>
+{% endfor %}
+{% endblock %}

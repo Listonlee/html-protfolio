@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}登入 — 補習主動搵客{% endblock %}
+{% block content %}
+<div class="login-wrap">
+  <div class="login-card">
+    <h1>🎯 補習主動搵客</h1>
+    <p class="muted">團隊內部工具,請登入</p>
+    {% if error %}<div class="alert">{{ error }}</div>{% endif %}
+    <form method="post" action="/login">
+      <label>Email</label>
+      <input type="email" name="email" required autofocus>
+      <label>密碼</label>
+      <input type="password" name="password" required>
+      <button type="submit" class="btn-primary full">登入</button>
+    </form>
+  </div>
+</div>
+{% endblock %}
